@@ -1,5 +1,6 @@
 using AILocalHelper.AI;
 using AILocalHelper.DB;
+using AILocalHelper.Messaging;
 
 namespace AILocalHelper
 {
@@ -11,8 +12,11 @@ namespace AILocalHelper
 
             // Add services to the container.
             builder.Services.AddRazorPages();
+            builder.Services.AddSignalR();
+
             builder.Services.AddSingleton<LiteDBService>();
             builder.Services.AddTransient<ChatService>();
+            builder.Services.AddScoped<CommunicationService>();
 
             var app = builder.Build();
 
@@ -32,6 +36,7 @@ namespace AILocalHelper
             app.UseAuthorization();
 
             app.MapRazorPages();
+            app.MapHub<CommunicationHub>("/communicationHub");
 
             app.Run();
         }

@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using AILocalHelper.DB;
 using AILocalHelper.Domain;
+using AILocalHelper.Messaging;
 using Microsoft.ML.OnnxRuntimeGenAI;
 
 namespace AILocalHelper.AI
@@ -11,30 +12,25 @@ namespace AILocalHelper.AI
         private LiteDBService _dBService;
         private static Model? _model;
         private static Tokenizer? _tokenizer;
+        private readonly CommunicationService _communicationService;
 
         private const string SystemPrompt =
             "You are an AI friend, try just to keep any conversation with short answers" +
             "Answer using a direct style. Do not provide more information than requested by user. " +
             "Answer user's question as short as possible.";
 
-        public ChatService(LiteDBService dBService)
+        public ChatService(LiteDBService dBService, CommunicationService communicationService)
         {
             _dBService = dBService;
+            _communicationService = communicationService;
         }
 
-        public void Ask(string userPrompt)
+        public async Task Ask(string userPrompt)
         {
-            if (_dBService.GetConfig().IsLocked) return;
-            _dBService.SetLock(true);
-
             try
             {
-                _dBService.AddToHistory(Actor.User, userPrompt);
-
-                if (userPrompt.Length == 0)
-                {
-                    return;
-                }
+                await _communicationService.AddHistoryRecord(
+                    HistoryRecord.CreateUserRecord(userPrompt));
 
                 if (_model == null || _tokenizer == null ||
                     _dBService.GetConfig().PathToModel != _modelPath)
@@ -53,17 +49,14 @@ namespace AILocalHelper.AI
                 generatorParams.SetInputSequences(tokens);
 
                 var generator = new Generator(_model, generatorParams);
-                Task.Run(() => GenerateResponse(context, generator));
-
-                _dBService.AddToHistory(Actor.AI, string.Empty);
+                GenerateResponse(context, generator);
             }
             catch (Exception ex)
             {
-                _dBService.SetLock(false);
-
                 var message = $"An error occurred: {ex.Message}";
 
-                _dBService.AddToHistory(Actor.System, message);
+                await _communicationService.AddHistoryRecord(
+                    HistoryRecord.CreateSystemRecord(message));
             }
         }
 
@@ -86,6 +79,9 @@ namespace AILocalHelper.AI
             Generator generator)
         {
             var result = new StringBuilder();
+
+            var record = HistoryRecord.CreateAIRecord(String.Empty);
+
             try
             {
                 while (!generator.IsDone())
@@ -97,14 +93,18 @@ namespace AILocalHelper.AI
                     var output = _tokenizer.Decode(newToken);
                     result.Append(output);
 
-                    _dBService.UpdateLastHistoryRecord(result.ToString());
+                    record.Message = result.ToString();
+                    _communicationService.SetPartialAIResponse(record)
+                        .GetAwaiter().GetResult();
                 }
             }
             finally
-            {
-                _dBService.SetLock(false);
-
+            {  
                 _dBService.UpdateContext(context + result);
+
+                record.Message = result.ToString();
+                _communicationService.AddHistoryRecord(record)
+                        .GetAwaiter().GetResult();
             }
         }
 

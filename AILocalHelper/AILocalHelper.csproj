@@ -8,6 +8,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="LiteDB" Version="5.0.20" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Common" Version="8.0.7" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.18.1" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.3.0" />
 	</ItemGroup>

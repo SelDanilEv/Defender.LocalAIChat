@@ -28,34 +28,20 @@ namespace AILocalHelper.DB
             return config;
         }
 
-        public void SetLock(bool isLocked)
-        {
-            var config = GetConfig();
-
-            config.IsLocked = isLocked;
-            _collection.Update(config);
-        }
-
         public void SetPathToModel(string pathToModel)
         {
             var config = GetConfig();
 
-            if (!config.IsLocked)
-            {
-                config.PathToModel = pathToModel;
-                _collection.Update(config);
-            }
+            config.PathToModel = pathToModel;
+            _collection.Update(config);
         }
 
         public string UpdateContext(string newContext)
         {
             var config = GetConfig();
 
-            if (!config.IsLocked)
-            {
-                config.Context = newContext;
-                _collection.Update(config);
-            }
+            config.Context = newContext;
+            _collection.Update(config);
 
             return config.Context;
         }
@@ -63,39 +49,13 @@ namespace AILocalHelper.DB
         public void ClearContext()
         {
             var config = GetConfig();
-            if (!config.IsLocked)
-            {
-                config.Context = String.Empty;
-                _collection.Update(config);
-            }
+            config.Context = String.Empty;
+            _collection.Update(config);
         }
 
-        public List<HistoryRecord> UpdateLastHistoryRecord(string message)
+        public List<HistoryRecord> AddToHistory(HistoryRecord record)
         {
             var config = GetConfig();
-
-            if (config.HistoryRecords.Any())
-            {
-                var lastRecord = config.HistoryRecords.Last();
-                lastRecord.Message = message;
-
-                _collection.Update(config);
-            }
-
-            return config.HistoryRecords;
-        }
-
-
-        public List<HistoryRecord> AddToHistory(string actor, string message)
-        {
-            var config = GetConfig();
-
-            var record = new HistoryRecord
-            {
-                CreatedDateTime = DateTime.Now,
-                Actor = actor,
-                Message = message
-            };
 
             config.HistoryRecords.Add(record);
 
@@ -109,12 +69,18 @@ namespace AILocalHelper.DB
             return config.HistoryRecords;
         }
 
+        public List<HistoryRecord> GetHistoryRecords()
+        {
+            var config = GetConfig();
+
+            return config.HistoryRecords;
+        }
+
         public Settings ResetConfig()
         {
             var config = GetConfig();
 
             config.Context = String.Empty;
-            config.IsLocked = false;
 
             _collection.Update(config);
 
@@ -129,7 +95,6 @@ namespace AILocalHelper.DB
                 Id = 1,
                 PathToModel = "",
                 Context = "",
-                IsLocked = false,
                 HistoryRecords = []
             };
 

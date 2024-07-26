@@ -4,30 +4,26 @@
     ViewData["Title"] = "Home page";
 }
 
-<script>
-    function updateHistory() {
-        fetch('Index?handler=UpdateHistory')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('historyTextArea').textContent = data;
-            });
-    }
-    function checkLock() {
-        fetch('Index?handler=CheckLock')
-            .then(response => response.json())
-            .then(isLocked => {
-                // Select all buttons within the form
-                const buttons = document.querySelectorAll('form button');
-                // Enable or disable buttons based on isLocked
-                buttons.forEach(button => {
-                    button.disabled = button.id == "reset" ? false : isLocked;
-                });
-            });
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.11/signalr.min.js"></script>
+
+<style>
+    .history-record {
+        padding: 10px;
+        margin: 5px 0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #f9f9f9;
     }
 
-    setInterval(updateHistory, 2000);
-    setInterval(checkLock, 2000);
-</script>
+    .history-record:hover {
+        background-color: #f1f1f1;
+    }
+
+    #AIResponse {
+        display: none;
+        white-space: pre-wrap; 
+    }
+</style>
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
@@ -46,11 +42,103 @@
     </form>
     <br />
 
-    <form method="post"  asp-page-handler="AskAI">
-        <input type="text" style="width:80%" name="UserPrompt" />
+    <form method="post" id="AskForm">
+        <input type="text" style="width:80%" id="UserPrompt" />
         <button type="submit">Ask</button>
     </form>
     <br />
 
-    <textarea id="historyTextArea" style="width:90%" readonly rows="10">@Model.CommunicationHistory</textarea>
+    <div id="AIResponse" class="history-record"></div>
+    <div id="HistoryRecords"></div>
 </div>
+
+<script>
+    const thinkingText = "Thinking ....";
+    var allowedToTypeAINext = true;
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/communicationHub")
+        .build();
+
+    const typeWriterEffect = (element, text, speed = 70) => {
+        if (!allowedToTypeAINext) return;
+
+        allowedToTypeAINext = false;
+
+        let i = 0;
+        const interval = setInterval(() => {
+            if (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                i++;
+            } else {
+                clearInterval(interval);
+                allowedToTypeAINext = true;
+            }
+        }, speed);
+    };
+
+    const updateAIResponseField = (message) => {
+        const aiResponseElement = document.getElementById("AIResponse");
+        if (!message) {
+            aiResponseElement.innerText = "";
+            aiResponseElement.style.display = "none";
+        } else {
+            if (aiResponseElement.innerText == thinkingText){
+                aiResponseElement.innerText = "";
+            }
+            aiResponseElement.style.display = "block";
+            
+            const currentLength = aiResponseElement.innerHTML.length;
+
+            const newPart = message.slice(currentLength);
+            typeWriterEffect(aiResponseElement, newPart);
+        }
+    };
+
+    const updateHistoryField = (message) => {
+        const historyRecordsContainer = document.getElementById("HistoryRecords");
+        const recordDiv = document.createElement("div");
+        recordDiv.className = "history-record";
+        recordDiv.innerText = message;
+        historyRecordsContainer.prepend(recordDiv);
+    };
+
+    connection.on("SetPartialAIResponse", (message) => {
+        updateAIResponseField(message);
+    });
+
+    connection.on("AddHistoryRecord", (message) => {
+        updateHistoryField(message);
+    });
+
+    connection.on("SetLock", (isLocked) => {
+        const buttons = document.querySelectorAll('form button');
+        buttons.forEach(button => {
+            button.disabled = button.id == "reset" ? false : isLocked;
+        });
+
+        if (!isLocked) {
+            updateAIResponseField("");
+        }
+    });
+
+    connection.start().then(() => {
+        document.getElementById("AskForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+            const userPrompt = document.getElementById("UserPrompt").value;
+            if (userPrompt) {
+                updateAIResponseField("Thinking ....");
+                connection.invoke("AskAI", userPrompt).catch(err => console.error(err.toString()));
+                document.getElementById("UserPrompt").value = "";
+            }
+        });
+
+        connection.invoke("GetHistoryRecords").then(historyRecords => {
+            console.log(historyRecords);
+
+            historyRecords.forEach(record => {
+                updateHistoryField(record);
+            });
+        }).catch(err => console.error(err.toString()));
+    }).catch(err => console.error(err.toString()));
+</script>
