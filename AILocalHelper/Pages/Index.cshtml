@@ -1,0 +1,56 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<script>
+    function updateHistory() {
+        fetch('Index?handler=UpdateHistory')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('historyTextArea').textContent = data;
+            });
+    }
+    function checkLock() {
+        fetch('Index?handler=CheckLock')
+            .then(response => response.json())
+            .then(isLocked => {
+                // Select all buttons within the form
+                const buttons = document.querySelectorAll('form button');
+                // Enable or disable buttons based on isLocked
+                buttons.forEach(button => {
+                    button.disabled = button.id == "reset" ? false : isLocked;
+                });
+            });
+    }
+
+    setInterval(updateHistory, 2000);
+    setInterval(checkLock, 2000);
+</script>
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <form method="post" asp-page-handler="SavePath">
+        <input style="width:90%" type="text" name="PathToModel" value="@Model.PathToModel" />
+        <button type="submit">Save path to model</button>
+    </form>
+
+    <br />
+    <form method="post" asp-page-handler="CleanContext">
+        <button type="submit">Clean Context</button>
+    </form>
+
+    <form method="post" asp-page-handler="ResetConfig">
+        <button id="reset" type="submit">Reset config</button>
+    </form>
+    <br />
+
+    <form method="post"  asp-page-handler="AskAI">
+        <input type="text" style="width:80%" name="UserPrompt" />
+        <button type="submit">Ask</button>
+    </form>
+    <br />
+
+    <textarea id="historyTextArea" style="width:90%" readonly rows="10">@Model.CommunicationHistory</textarea>
+</div>
