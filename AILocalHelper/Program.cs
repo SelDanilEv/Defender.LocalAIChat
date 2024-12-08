@@ -38,7 +38,7 @@ namespace AILocalHelper
             app.MapRazorPages();
             app.MapHub<CommunicationHub>("/communicationHub");
 
-            app.Run();
+            await app.RunAsync();
         }
     }
 }
